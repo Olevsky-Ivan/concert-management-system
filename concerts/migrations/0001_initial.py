@@ -9,30 +9,59 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Concert',
+            name="Concert",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('city', models.CharField(max_length=100)),
-                ('place', models.CharField(max_length=200)),
-                ('date', models.DateTimeField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("city", models.CharField(max_length=100)),
+                ("place", models.CharField(max_length=200)),
+                ("date", models.DateTimeField()),
             ],
         ),
         migrations.CreateModel(
-            name='Zone',
+            name="Zone",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=50)),
-                ('price', models.DecimalField(decimal_places=2, max_digits=8, validators=[django.core.validators.MinValueValidator(0)])),
-                ('total_seats', models.PositiveIntegerField()),
-                ('concert', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='zones', to='concerts.concert')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=50)),
+                (
+                    "price",
+                    models.DecimalField(
+                        decimal_places=2,
+                        max_digits=8,
+                        validators=[django.core.validators.MinValueValidator(0)],
+                    ),
+                ),
+                ("total_seats", models.PositiveIntegerField()),
+                (
+                    "concert",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="zones",
+                        to="concerts.concert",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('concert', 'name')},
+                "unique_together": {("concert", "name")},
             },
         ),
     ]

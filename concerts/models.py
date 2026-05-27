@@ -9,7 +9,7 @@ class Concert(models.Model):
 
     def __str__(self):
         return f"{self.city} - {self.place}"
-    
+
 
 class Zone(models.Model):
     concert = models.ForeignKey(
@@ -30,7 +30,6 @@ class Zone(models.Model):
 
     class Meta:
         unique_together = ("concert", "name")
- 
 
     def __str__(self):
         return f"{self.name} - {self.concert}"

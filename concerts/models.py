@@ -10,22 +10,11 @@ class Concert(models.Model):
     place = models.CharField(max_length=255)
     date = models.DateTimeField()
 
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
-    artists = models.ManyToManyField(
-        "Artist",
-        related_name="concerts",
-        blank=True
-    )
+    artists = models.ManyToManyField("Artist", related_name="concerts", blank=True)
 
-    categories = models.ManyToManyField(
-        "Category",
-        related_name="concerts",
-        blank=True
-    )
+    categories = models.ManyToManyField("Category", related_name="concerts", blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -35,18 +24,11 @@ class Concert(models.Model):
 
 
 class Zone(models.Model):
-    concert = models.ForeignKey(
-        Concert,
-        on_delete=models.CASCADE,
-        related_name="zones"
-    )
+    concert = models.ForeignKey(Concert, on_delete=models.CASCADE, related_name="zones")
 
     name = models.CharField(max_length=100)
 
-    price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
-    )
+    price = models.DecimalField(max_digits=10, decimal_places=2)
 
     capacity = models.PositiveIntegerField()
 
@@ -55,13 +37,10 @@ class Zone(models.Model):
 
     def available_seats(self):
         reserved = self.reservations.filter(
-            is_active=True,
-            expires_at__gt=timezone.now()
+            is_active=True, expires_at__gt=timezone.now()
         ).count()
 
-        sold = self.tickets.filter(
-            status__in=["reserved", "paid"]
-        ).count()
+        sold = self.tickets.filter(status__in=["reserved", "paid"]).count()
 
         return self.capacity - reserved - sold
 
@@ -77,31 +56,19 @@ class Artist(models.Model):
 
 
 class Category(models.Model):
-    name = models.CharField(
-        max_length=100,
-        unique=True
-    )
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
 
 
 class Review(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
-    concert = models.ForeignKey(
-        Concert,
-        on_delete=models.CASCADE
-    )
+    concert = models.ForeignKey(Concert, on_delete=models.CASCADE)
 
     rating = models.IntegerField(
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(5)
-        ]
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
 
     comment = models.TextField(blank=True)
@@ -111,11 +78,9 @@ class Review(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "concert"],
-                name="unique_user_concert_review"
+                fields=["user", "concert"], name="unique_user_concert_review"
             )
         ]
 
     def __str__(self):
         return f"{self.user.email} - {self.concert.title}"
-

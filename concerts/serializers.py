@@ -29,23 +29,21 @@ class ReviewSerializer(serializers.ModelSerializer):
 class ConcertSerializer(serializers.ModelSerializer):
     # WRITE (IDs)
     artists = serializers.PrimaryKeyRelatedField(
-        queryset=Artist.objects.all(),
-        many=True
+        queryset=Artist.objects.all(), many=True
     )
 
     categories = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(),
-        many=True
+        queryset=Category.objects.all(), many=True
     )
 
     # READ (nested)
     artists_detail = ArtistSerializer(source="artists", many=True, read_only=True)
-    categories_detail = CategorySerializer(source="categories", many=True, read_only=True)
+    categories_detail = CategorySerializer(
+        source="categories", many=True, read_only=True
+    )
     zones = ZoneSerializer(many=True, read_only=True)
 
-    created_by = serializers.HiddenField(
-        default=serializers.CurrentUserDefault()
-    )
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = Concert
@@ -56,11 +54,9 @@ class ConcertSerializer(serializers.ModelSerializer):
             "place",
             "date",
             "created_by",
-
             # write
             "artists",
             "categories",
-
             # read
             "artists_detail",
             "categories_detail",

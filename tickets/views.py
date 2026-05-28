@@ -14,9 +14,7 @@ from tickets.serializers import (
 
 
 class TicketViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    viewsets.GenericViewSet
+    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
 ):
     queryset = Ticket.objects.all()
     serializer_class = TicketSerializer
@@ -33,7 +31,7 @@ class TicketViewSet(
         if request.user.role != "customer":
             return Response(
                 {"detail": "Only customers can buy tickets"},
-                status=status.HTTP_403_FORBIDDEN
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         concert_id = request.data.get("concert_id")
@@ -42,24 +40,19 @@ class TicketViewSet(
         if not concert_id or not zone_id:
             return Response(
                 {"detail": "concert_id and zone_id required"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        zone = Zone.objects.filter(
-            id=zone_id,
-            concert_id=concert_id
-        ).first()
+        zone = Zone.objects.filter(id=zone_id, concert_id=concert_id).first()
 
         if not zone:
             return Response(
-                {"detail": "Zone not found"},
-                status=status.HTTP_404_NOT_FOUND
+                {"detail": "Zone not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         if zone.available_seats() <= 0:
             return Response(
-                {"detail": "No available seats"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "No available seats"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         ticket = Ticket.objects.create(
@@ -67,30 +60,24 @@ class TicketViewSet(
             concert_id=concert_id,
             zone=zone,
             price=zone.price,
-            status=Ticket.Status.PAID
+            status=Ticket.Status.PAID,
         )
 
         serializer = TicketSerializer(ticket)
 
-        return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED
-        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         ticket = self.get_object()
 
         if ticket.user != request.user:
-            return Response(
-                {"detail": "Not allowed"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"detail": "Not allowed"}, status=status.HTTP_403_FORBIDDEN)
 
         if ticket.status == Ticket.Status.CANCELED:
             return Response(
                 {"detail": "Ticket already canceled"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         ticket.status = Ticket.Status.CANCELED
@@ -116,15 +103,12 @@ class ReservationViewSet(viewsets.ModelViewSet):
         zone = serializer.validated_data["zone"]
 
         expired_reservations = zone.reservations.filter(
-            expires_at__lte=timezone.now(),
-            is_active=True
+            expires_at__lte=timezone.now(), is_active=True
         )
 
         expired_reservations.update(is_active=False)
 
         if zone.available_seats() <= 0:
-            raise serializer.ValidationError(
-                {"detail": "No available seats"}
-            )
+            raise serializer.ValidationError({"detail": "No available seats"})
 
         serializer.save(user=self.request.user)

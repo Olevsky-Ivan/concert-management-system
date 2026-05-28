@@ -1,25 +1,39 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
+# Environments
 venv/
 .venv/
 env/
 ENV/
 
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Migrations cache only
+*/migrations/*.pyc
+*/migrations/__pycache__/
+
+# Env file
+.env
+
+# IDE
 .vscode/
 .idea/
 
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
+# Logs
 *.log
 
+# OS
 .DS_Store
 Thumbs.db
-
-*.orig
-
-.env

@@ -4,7 +4,15 @@ from .models import Reservation, Order, Ticket
 
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ("user", "concert", "zone", "seat", "price", "is_active", "expires_at")
+    list_display = (
+        "user",
+        "concert",
+        "zone",
+        "seat",
+        "price",
+        "is_active",
+        "expires_at",
+    )
     list_filter = ("is_active", "zone")
 
 

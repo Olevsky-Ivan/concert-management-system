@@ -53,10 +53,11 @@ class Reservation(models.Model):
 
     def __str__(self):
         seat_label = (
-            f" | Row {self.seat.row} Seat {self.seat.number}"
-            if self.seat else ""
+            f" | Row {self.seat.row} Seat {self.seat.number}" if self.seat else ""
         )
-        return f"{self.user.email} – {self.concert.title} / {self.zone.name}{seat_label}"
+        return (
+            f"{self.user.email} – {self.concert.title} / {self.zone.name}{seat_label}"
+        )
 
     @property
     def is_expired(self):
@@ -100,9 +101,7 @@ class Order(models.Model):
         return self.status == self.Status.PENDING
 
     def recalculate_total(self):
-        self.total_price = self.reservations.filter(
-            is_active=True
-        ).aggregate(
+        self.total_price = self.reservations.filter(is_active=True).aggregate(
             total=models.Sum("price")
         )["total"] or Decimal("0.00")
         self.save(update_fields=["total_price"])

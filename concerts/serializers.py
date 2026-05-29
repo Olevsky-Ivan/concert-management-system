@@ -38,7 +38,6 @@ class HallSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "venue", "venue_detail"]
 
 
-
 class SeatSerializer(serializers.ModelSerializer):
     is_taken = serializers.BooleanField(read_only=True, default=False)
 
@@ -60,6 +59,7 @@ class ZoneListSerializer(serializers.ModelSerializer):
             "has_seats",
             "available_seats",
         ]
+
     # Returns number of available seats in this zone for a given concert (from serializer context)
     def get_available_seats(self, zone):
         concert_id = self.context.get("concert_id")
@@ -107,12 +107,14 @@ class ZoneDetailSerializer(serializers.ModelSerializer):
         seats = zone.seats.all()
         data = []
         for seat in seats:
-            data.append({
-                "id": seat.id,
-                "row": seat.row,
-                "number": seat.number,
-                "is_taken": seat.pk in taken_ids,
-            })
+            data.append(
+                {
+                    "id": seat.id,
+                    "row": seat.row,
+                    "number": seat.number,
+                    "is_taken": seat.pk in taken_ids,
+                }
+            )
         return data
 
 

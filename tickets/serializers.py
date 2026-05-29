@@ -13,6 +13,7 @@ class ReservationSerializer(serializers.ModelSerializer):
     - validates seat availability
     - sets price and expiration time
     """
+
     user_email = serializers.ReadOnlyField(source="user.email")
     concert_title = serializers.ReadOnlyField(source="concert.title")
     zone_name = serializers.ReadOnlyField(source="zone.name")
@@ -173,7 +174,7 @@ class CheckoutSerializer(serializers.Serializer):
     reservation_ids = serializers.ListField(
         child=serializers.IntegerField(), min_length=1
     )
-    
+
     # Ensures reservations belong to user, are active, not expired, and not already ordered
     def validate_reservation_ids(self, ids):
         user = self.context["request"].user
@@ -221,15 +222,17 @@ class CheckoutSerializer(serializers.Serializer):
             reservation.is_active = False
             reservation.save(update_fields=["order", "is_active"])
 
-            tickets.append(Ticket(
-                user=user,
-                order=order,
-                concert=reservation.concert,
-                zone=reservation.zone,
-                seat=reservation.seat,
-                price=reservation.price,
-                status=Ticket.Status.ACTIVE,
-            ))
+            tickets.append(
+                Ticket(
+                    user=user,
+                    order=order,
+                    concert=reservation.concert,
+                    zone=reservation.zone,
+                    seat=reservation.seat,
+                    price=reservation.price,
+                    status=Ticket.Status.ACTIVE,
+                )
+            )
 
         Ticket.objects.bulk_create(tickets)
         return order

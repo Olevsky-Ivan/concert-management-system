@@ -141,12 +141,20 @@ class ReviewSerializer(serializers.ModelSerializer):
         read_only_fields = ["user", "created_at"]
 
     def validate(self, attrs):
-        request = self.context["request"]
-        concert = attrs.get("concert")
-        if concert and not concert.is_past:
+        concert = attrs.get(
+            "concert",
+            self.instance.concert if self.instance else None,
+        )
+
+        if not concert.is_past:
             raise serializers.ValidationError(
-                "You can only review concerts that have already taken place."
+                {
+                    "concert": (
+                        "You can only review concerts " "that have already taken place."
+                    )
+                }
             )
+
         return attrs
 
 

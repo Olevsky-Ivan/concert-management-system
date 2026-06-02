@@ -87,7 +87,7 @@ class Zone(models.Model):
             Ticket.objects.filter(
                 concert_id=concert_id,
                 zone=self,
-                status__in=[Ticket.Status.PAID, Ticket.Status.RESERVED],
+                status__in=[Ticket.Status.ACTIVE],
                 seat__isnull=False,
             ).values_list("seat_id", flat=True)
         )

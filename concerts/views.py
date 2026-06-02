@@ -50,17 +50,25 @@ class ZoneViewSet(viewsets.ModelViewSet):
         return ZoneDetailSerializer
 
 
+
 class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.select_related("user", "concert")
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        concert_id = self.request.query_params.get("concert_id")
-        if concert_id:
-            qs = qs.filter(concert_id=concert_id)
-        return qs
+        qs = Review.objects.select_related("user", "concert")
+
+        concert_pk = self.kwargs.get("concert_pk")
+
+        if concert_pk:
+            return qs.filter(concert_id=concert_pk)
+
+        return qs.none()
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        concert_pk = self.kwargs.get("concert_pk")
+        serializer.save(
+            user=self.request.user,
+            concert_id=concert_pk
+        )
+

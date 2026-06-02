@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
 
-class IsOrganizer(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == "organizer"
+class IsOwnerOrAdmin(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return request.user == obj.user or request.user.role == "admin"

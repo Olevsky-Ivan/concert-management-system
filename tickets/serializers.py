@@ -7,13 +7,6 @@ from decimal import Decimal
 
 
 class ReservationSerializer(serializers.ModelSerializer):
-    """
-    Handles reservation creation and validation:
-    - checks concert/zone consistency
-    - validates seat availability
-    - sets price and expiration time
-    """
-
     user_email = serializers.ReadOnlyField(source="user.email")
     concert_title = serializers.ReadOnlyField(source="concert.title")
     zone_name = serializers.ReadOnlyField(source="zone.name")
@@ -190,11 +183,10 @@ class CheckoutSerializer(serializers.Serializer):
                 "Some reservations are invalid, already ordered, or don't belong to you."
             )
 
-        now = timezone.now()
-        expired = [r for r in reservations if r.expires_at <= now]
+        expired = [r for r in reservations if r.is_expired]
         if expired:
-            for r in expired:
-                r.expire()
+            for reservation in expired:
+                reservation.expire()
             raise serializers.ValidationError(
                 "Some reservations have expired. Please re-add them to your cart."
             )
@@ -202,39 +194,24 @@ class CheckoutSerializer(serializers.Serializer):
         self._reservations = list(reservations)
         return ids
 
-    # Creates order, marks reservations inactive, and generates tickets in bulk
+    # Creates order and attaches reservations to it
     def create_order(self):
         user = self.context["request"].user
         reservations = self._reservations
-
         total = sum(r.price for r in reservations)
 
         order = Order.objects.create(
             user=user,
             total_price=total,
-            status=Order.Status.PAID,
-            paid_at=timezone.now(),
+            status=Order.Status.PENDING,
         )
 
-        tickets = []
         for reservation in reservations:
             reservation.order = order
-            reservation.is_active = False
-            reservation.save(update_fields=["order", "is_active"])
+            reservation.save(update_fields=["order"])
 
-            tickets.append(
-                Ticket(
-                    user=user,
-                    order=order,
-                    concert=reservation.concert,
-                    zone=reservation.zone,
-                    seat=reservation.seat,
-                    price=reservation.price,
-                    status=Ticket.Status.ACTIVE,
-                )
-            )
+        # Stripe — initiate payment session here, return payment_url
 
-        Ticket.objects.bulk_create(tickets)
         return order
 
 

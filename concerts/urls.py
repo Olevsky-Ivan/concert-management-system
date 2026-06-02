@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from concerts.views import (
@@ -10,13 +10,32 @@ from concerts.views import (
 )
 
 router = DefaultRouter()
-
 router.register("concerts", ConcertViewSet, basename="concert")
 router.register("artists", ArtistViewSet, basename="artist")
 router.register("categories", CategoryViewSet, basename="category")
 router.register("zones", ZoneViewSet, basename="zone")
-router.register("reviews", ReviewViewSet, basename="review")
+
+review_list = ReviewViewSet.as_view({
+    "get": "list",
+    "post": "create",
+})
+
+review_detail = ReviewViewSet.as_view({
+    "get": "retrieve",
+    "put": "update",
+    "patch": "partial_update",
+    "delete": "destroy",
+})
 
 urlpatterns = [
     path("", include(router.urls)),
+
+    path(
+        "concerts/<int:concert_pk>/reviews/",
+        review_list,
+    ),
+    path(
+        "concerts/<int:concert_pk>/reviews/<int:pk>/",
+        review_detail,
+    ),
 ]

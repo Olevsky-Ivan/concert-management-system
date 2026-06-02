@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from tickets.models import Order, Reservation, Ticket
+from tickets.permissions import IsOwnerOrAdmin
 from tickets.serializers import (
     CartSummarySerializer,
     CheckoutSerializer,
@@ -22,9 +23,8 @@ class ReservationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-
     serializer_class = ReservationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
     def get_queryset(self):
         qs = Reservation.objects.select_related(
@@ -37,15 +37,10 @@ class ReservationViewSet(
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    # Cancels reservation (marks as expired instead of deleting)
+    # Cancels reservation (marks as inactive instead of deleting)
     def destroy(self, request, *args, **kwargs):
         reservation = self.get_object()
-
-        if reservation.user != request.user and request.user.role != "admin":
-            return Response(
-                {"detail": "Not allowed."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        self.check_object_permissions(request, reservation)
 
         if not reservation.is_active:
             return Response(
@@ -64,7 +59,6 @@ class ReservationViewSet(
     def cart(self, request):
         now = timezone.now()
 
-        # Expire stale ones silently
         Reservation.objects.filter(
             user=request.user,
             is_active=True,
@@ -102,9 +96,8 @@ class OrderViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-
     serializer_class = OrderReadSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
     def get_queryset(self):
         qs = Order.objects.prefetch_related(
@@ -119,7 +112,6 @@ class OrderViewSet(
             return qs.all()
         return qs.filter(user=self.request.user)
 
-    # Converts validated reservations into a paid order with generated tickets
     @action(detail=False, methods=["post"])
     def checkout(self, request):
         with transaction.atomic():
@@ -127,8 +119,9 @@ class OrderViewSet(
                 data=request.data, context={"request": request}
             )
             serializer.is_valid(raise_exception=True)
-
             order = serializer.create_order()
+
+            # Stripe connection
 
             return Response(
                 OrderReadSerializer(order, context={"request": request}).data,
@@ -140,21 +133,23 @@ class OrderViewSet(
     def cancel(self, request, pk=None):
         with transaction.atomic():
             order = self.get_object()
+            self.check_object_permissions(request, order)
 
-            if order.user != request.user and request.user.role != "admin":
-                return Response({"detail": "Not allowed."}, status=403)
-
-            if order.status == Order.Status.CANCELED:
-                return Response({"detail": "Order is already canceled."}, status=400)
-
-            if order.status == Order.Status.EXPIRED:
+            if order.is_canceled:
                 return Response(
-                    {"detail": "Expired orders cannot be canceled."}, status=400
+                    {"detail": "Order is already canceled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if order.is_expired:
+                return Response(
+                    {"detail": "Expired orders cannot be canceled."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             order.status = Order.Status.CANCELED
             order.save(update_fields=["status"])
-
+            order.reservations.update(is_active=False)
             order.tickets.filter(status=Ticket.Status.ACTIVE).update(
                 status=Ticket.Status.CANCELED
             )
@@ -169,9 +164,8 @@ class TicketViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-
     serializer_class = TicketSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
     def get_queryset(self):
         qs = Ticket.objects.select_related("user", "order", "concert", "zone", "seat")
@@ -183,30 +177,17 @@ class TicketViewSet(
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         ticket = self.get_object()
-        is_admin = request.user.role == "admin"
-        is_owner = ticket.user == request.user
+        self.check_object_permissions(request, ticket)
 
-        if not is_owner and not is_admin:
-            return Response(
-                {"detail": "Not allowed."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if ticket.status == Ticket.Status.CANCELED:
+        if ticket.is_canceled:
             return Response(
                 {"detail": "Ticket is already canceled."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if ticket.status == Ticket.Status.USED:
+        if ticket.is_used:
             return Response(
                 {"detail": "Cannot cancel a ticket that has already been used."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not is_admin and ticket.concert.is_past:
-            return Response(
-                {"detail": "Cannot cancel a ticket after the concert has taken place."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

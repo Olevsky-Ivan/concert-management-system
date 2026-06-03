@@ -113,7 +113,7 @@ class Zone(models.Model):
         paid_count = Ticket.objects.filter(
             concert_id=concert_id,
             zone=self,
-            status__in=[Ticket.Status.PAID, Ticket.Status.RESERVED],
+            status__in=[Ticket.Status.ACTIVE],
         ).count()
 
         reserved_count = Reservation.objects.filter(

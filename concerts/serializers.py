@@ -43,7 +43,20 @@ class SeatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Seat
-        fields = ["id", "row", "number", "is_taken"]
+        fields = ["id", "zone", "row", "number", "is_taken"]
+        read_only_fields = ["zone"]
+    
+    def validate(self, attrs):
+        zone = self.context["view"].kwargs.get("zone_pk")
+        row = attrs.get("row")
+        number = attrs.get("number")
+
+        if Seat.objects.filter(zone_id=zone, row=row, number=number).exists():
+            raise serializers.ValidationError(
+                {"non_field_errors": f"Seat Row {row}, Number {number} already exists in this zone."}
+            )
+
+        return attrs
 
 
 class ZoneListSerializer(serializers.ModelSerializer):
@@ -138,25 +151,44 @@ class ReviewSerializer(serializers.ModelSerializer):
             "comment",
             "created_at",
         ]
-        read_only_fields = ["user", "created_at"]
+        read_only_fields = ["user", "concert", "created_at"]
 
     def validate(self, attrs):
-        concert = attrs.get(
-            "concert",
-            self.instance.concert if self.instance else None,
-        )
+        request = self.context.get("request")
+        view = self.context.get("view")
+
+        if self.instance:
+            concert = self.instance.concert
+        else:
+            concert_pk = view.kwargs.get("concert_pk")
+            try:
+                concert = Concert.objects.get(pk=concert_pk)
+            except Concert.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"concert": "Concert not found."}
+                )
 
         if not concert.is_past:
             raise serializers.ValidationError(
-                {
-                    "concert": (
-                        "You can only review concerts " "that have already taken place."
-                    )
-                }
+                {"concert": "You can only review concerts that have already taken place."}
             )
 
-        return attrs
+        #uncomment after connecting Stripe
+        """
+        from tickets.models import Ticket
+        has_ticket = Ticket.objects.filter(
+            user=request.user,
+            concert=concert,
+            status=Ticket.Status.ACTIVE,
+        ).exists()
 
+        if not has_ticket:
+            raise serializers.ValidationError(
+                {"concert": "You can only review concerts you have attended."}
+            )
+        """
+
+        return attrs
 
 class ConcertReadSerializer(serializers.ModelSerializer):
     hall = HallSerializer(read_only=True)

@@ -26,7 +26,7 @@ INSTALLED_APPS = [
     "users",
     "concerts",
     "tickets",
-    "django_extensions"
+    "django_extensions",
 ]
 
 

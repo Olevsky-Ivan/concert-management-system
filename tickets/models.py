@@ -100,6 +100,14 @@ class Order(models.Model):
     def is_payable(self):
         return self.status == self.Status.PENDING
 
+    @property
+    def is_canceled(self):
+        return self.status == self.Status.CANCELED
+
+    @property
+    def is_expired(self):
+        return self.status == self.Status.EXPIRED
+    
     def recalculate_total(self):
         self.total_price = self.reservations.filter(is_active=True).aggregate(
             total=models.Sum("price")
@@ -163,3 +171,11 @@ class Ticket(models.Model):
     @property
     def is_cancelable(self):
         return self.status == self.Status.ACTIVE and not self.concert.is_past
+
+    @property
+    def is_canceled(self):
+        return self.status == self.Status.CANCELED
+
+    @property
+    def is_used(self):
+        return self.status == self.Status.USED

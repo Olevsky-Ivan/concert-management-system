@@ -119,9 +119,9 @@ class OrderViewSet(
                 data=request.data, context={"request": request}
             )
             serializer.is_valid(raise_exception=True)
-            order = serializer.create_order()
-
             # Stripe connection
+
+            order = serializer.create_order()
 
             return Response(
                 OrderReadSerializer(order, context={"request": request}).data,

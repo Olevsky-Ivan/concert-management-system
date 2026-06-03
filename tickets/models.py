@@ -93,6 +93,8 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
 
+    stripe_session_id = models.CharField(max_length=255, blank=True, null=True)
+    
     def __str__(self):
         return f"Order #{self.pk} – {self.user.email} – {self.status}"
 

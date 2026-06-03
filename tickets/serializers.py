@@ -1,4 +1,8 @@
+import stripe
+
+
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import serializers
 
 from concerts.models import Concert, Seat, Zone
@@ -210,8 +214,28 @@ class CheckoutSerializer(serializers.Serializer):
             reservation.order = order
             reservation.save(update_fields=["order"])
 
-        # Stripe — initiate payment session here, return payment_url
+        # Stripe — initiate payment session
+        stripe.api_key = settings.STRIPE_SECRET_KEY
 
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": settings.STRIPE_CURRENCY,
+                    "product_data": {"name": f"Order #{order.pk}"},
+                    "unit_amount": int(total * 100),
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            metadata={"order_id": order.pk},
+            success_url="http://localhost:8000/success/",
+            cancel_url="http://localhost:8000/cancel/",
+        )
+        order.stripe_session_id = session.id
+        order.save(update_fields=["stripe_session_id"])
+
+        self._payment_url = session.url
         return order
 
 

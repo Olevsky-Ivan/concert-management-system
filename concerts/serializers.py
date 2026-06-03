@@ -173,8 +173,7 @@ class ReviewSerializer(serializers.ModelSerializer):
                 {"concert": "You can only review concerts that have already taken place."}
             )
 
-        #uncomment after connecting Stripe
-        """
+
         from tickets.models import Ticket
         has_ticket = Ticket.objects.filter(
             user=request.user,
@@ -186,7 +185,6 @@ class ReviewSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"concert": "You can only review concerts you have attended."}
             )
-        """
 
         return attrs
 

@@ -15,7 +15,6 @@ from tickets.serializers import (
     TicketSerializer,
 )
 
-
 class ReservationViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -119,12 +118,13 @@ class OrderViewSet(
                 data=request.data, context={"request": request}
             )
             serializer.is_valid(raise_exception=True)
-            # Stripe connection
-
             order = serializer.create_order()
 
             return Response(
-                OrderReadSerializer(order, context={"request": request}).data,
+                {
+                    **OrderReadSerializer(order, context={"request": request}).data,
+                    "payment_url": serializer._payment_url,
+                },
                 status=status.HTTP_201_CREATED,
             )
 

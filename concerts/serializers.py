@@ -46,6 +46,7 @@ class SeatSerializer(serializers.ModelSerializer):
         fields = ["id", "zone", "row", "number", "is_taken"]
         read_only_fields = ["zone"]
     
+    # Prevent duplicate seats in zone
     def validate(self, attrs):
         zone = self.context["view"].kwargs.get("zone_pk")
         row = attrs.get("row")
@@ -98,13 +99,14 @@ class ZoneDetailSerializer(serializers.ModelSerializer):
             "seats",
         ]
 
-    # Builds seat map for the zone and marks seats as taken based on concert_id from request query params
+    # Gets concert_id from query params.
     def _concert_id(self):
         request = self.context.get("request")
         if request:
             return request.query_params.get("concert_id")
         return None
 
+    # Returns avaible sets in zone
     def get_available_seats(self, zone):
         concert_id = self._concert_id()
         if concert_id is None:
@@ -153,6 +155,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["user", "concert", "created_at"]
 
+    # Checks whether the user can review the concert
     def validate(self, attrs):
         request = self.context.get("request")
         view = self.context.get("view")

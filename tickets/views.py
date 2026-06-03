@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from tickets.models import Order, Reservation, Ticket
 from tickets.permissions import IsOwnerOrAdmin
+from tickets.services import create_checkout_session
 from tickets.serializers import (
     CartSummarySerializer,
     CheckoutSerializer,
@@ -111,22 +112,31 @@ class OrderViewSet(
             return qs.all()
         return qs.filter(user=self.request.user)
 
+    #create order and returns payment_url
     @action(detail=False, methods=["post"])
     def checkout(self, request):
-        with transaction.atomic():
-            serializer = CheckoutSerializer(
-                data=request.data, context={"request": request}
-            )
-            serializer.is_valid(raise_exception=True)
-            order = serializer.create_order()
+        serializer = CheckoutSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
 
-            return Response(
-                {
-                    **OrderReadSerializer(order, context={"request": request}).data,
-                    "payment_url": serializer._payment_url,
-                },
-                status=status.HTTP_201_CREATED,
+        with transaction.atomic():
+            order, payment_url = create_checkout_session(
+                user=request.user,
+                reservations=serializer.reservations,
             )
+
+        return Response(
+            {
+                **OrderReadSerializer(
+                    order,
+                    context={"request": request},
+                ).data,
+                "payment_url": payment_url,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     # Cancels order and updates related tickets status accordingly
     @action(detail=True, methods=["post"])

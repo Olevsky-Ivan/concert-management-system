@@ -169,18 +169,23 @@ class CartSummarySerializer(serializers.Serializer):
 # Validates reservation ownership and status, then converts them into a paid order with tickets
 class CheckoutSerializer(serializers.Serializer):
     reservation_ids = serializers.ListField(
-        child=serializers.IntegerField(), min_length=1
+        child=serializers.IntegerField(),
+        min_length=1,
     )
 
-    # Ensures reservations belong to user, are active, not expired, and not already ordered
     def validate_reservation_ids(self, ids):
         user = self.context["request"].user
+
         reservations = Reservation.objects.filter(
             id__in=ids,
             user=user,
             is_active=True,
             order__isnull=True,
-        ).select_related("concert", "zone", "seat")
+        ).select_related(
+            "concert",
+            "zone",
+            "seat",
+        )
 
         if reservations.count() != len(set(ids)):
             raise serializers.ValidationError(
@@ -191,52 +196,14 @@ class CheckoutSerializer(serializers.Serializer):
         if expired:
             for reservation in expired:
                 reservation.expire()
+
             raise serializers.ValidationError(
                 "Some reservations have expired. Please re-add them to your cart."
             )
 
-        self._reservations = list(reservations)
+        self.reservations = list(reservations)
+
         return ids
-
-    # Creates order and attaches reservations to it
-    def create_order(self):
-        user = self.context["request"].user
-        reservations = self._reservations
-        total = sum(r.price for r in reservations)
-
-        order = Order.objects.create(
-            user=user,
-            total_price=total,
-            status=Order.Status.PENDING,
-        )
-
-        for reservation in reservations:
-            reservation.order = order
-            reservation.save(update_fields=["order"])
-
-        # Stripe — initiate payment session
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": settings.STRIPE_CURRENCY,
-                    "product_data": {"name": f"Order #{order.pk}"},
-                    "unit_amount": int(total * 100),
-                },
-                "quantity": 1,
-            }],
-            mode="payment",
-            metadata={"order_id": order.pk},
-            success_url="http://localhost:8000/success/",
-            cancel_url="http://localhost:8000/cancel/",
-        )
-        order.stripe_session_id = session.id
-        order.save(update_fields=["stripe_session_id"])
-
-        self._payment_url = session.url
-        return order
 
 
 class TicketSerializer(serializers.ModelSerializer):

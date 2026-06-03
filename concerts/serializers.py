@@ -173,7 +173,6 @@ class ReviewSerializer(serializers.ModelSerializer):
                 {"concert": "You can only review concerts that have already taken place."}
             )
 
-
         from tickets.models import Ticket
         has_ticket = Ticket.objects.filter(
             user=request.user,

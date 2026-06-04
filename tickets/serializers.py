@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from concerts.models import Concert, Seat, Zone
 from tickets.models import RESERVATION_LIFETIME_MINUTES, Order, Reservation, Ticket
+from tickets.services import create_checkout_session
 from decimal import Decimal
 
 
@@ -204,6 +205,12 @@ class CheckoutSerializer(serializers.Serializer):
         self.reservations = list(reservations)
 
         return ids
+
+    def create_order(self):
+        user = self.context["request"].user
+        order, payment_url = create_checkout_session(user, self.reservations)
+        self._payment_url = payment_url
+        return order
 
 
 class TicketSerializer(serializers.ModelSerializer):

@@ -1,5 +1,14 @@
-from django.utils import timezone
+import logging
+
+import stripe
+from django.conf import settings
 from django.db import transaction
+from django.http import HttpResponse
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +16,6 @@ from rest_framework.response import Response
 
 from tickets.models import Order, Reservation, Ticket
 from tickets.permissions import IsOwnerOrAdmin
-from tickets.services import create_checkout_session
 from tickets.serializers import (
     CartSummarySerializer,
     CheckoutSerializer,
@@ -15,6 +23,76 @@ from tickets.serializers import (
     ReservationSerializer,
     TicketSerializer,
 )
+from tickets.services import confirm_order_payment
+
+logger = logging.getLogger(__name__)
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class StripeWebhookView(View):
+
+    def post(self, request):
+        payload = request.body
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+
+        try:
+            event = stripe.Webhook.construct_event(
+                payload,
+                sig_header,
+                settings.STRIPE_WEBHOOK_SECRET,
+            )
+        except ValueError:
+            logger.warning("Invalid Stripe webhook payload")
+            return HttpResponse(status=400)
+        except stripe.error.SignatureVerificationError:
+            logger.warning("Invalid Stripe webhook signature")
+            return HttpResponse(status=400)
+
+        logger.info("Stripe event: %s", event["type"])
+        session = event["data"]["object"]
+
+        if event["type"] == "checkout.session.completed":
+            self._handle_checkout_completed(session)
+
+        elif event["type"] == "checkout.session.expired":
+            self._handle_checkout_expired(session)
+
+        elif event["type"] in ("payment_intent.payment_failed", "charge.failed"):
+            self._handle_payment_failed(session)
+
+        return HttpResponse(status=200)
+
+    def _handle_checkout_completed(self, session):
+        try:
+            order_id = session["metadata"]["order_id"]
+            order = Order.objects.get(pk=order_id, status=Order.Status.PENDING)
+            confirm_order_payment(order)
+            logger.info("Payment confirmed for order %s", order.pk)
+        except KeyError:
+            logger.warning("order_id not found in Stripe session metadata")
+        except Order.DoesNotExist:
+            logger.warning(
+                "Order %s not found or not pending",
+                session.get("metadata", {}).get("order_id"),
+            )
+
+    def _handle_checkout_expired(self, session):
+        try:
+            order_id = session["metadata"]["order_id"]
+            order = Order.objects.get(pk=order_id, status=Order.Status.PENDING)
+            order.status = Order.Status.EXPIRED
+            order.save(update_fields=["status"])
+            order.reservations.update(is_active=False)
+            logger.info("Order %s expired — seats released", order.pk)
+        except KeyError:
+            logger.warning("order_id not found in expired session metadata")
+        except Order.DoesNotExist:
+            logger.warning("Order not found for expired session")
+
+    def _handle_payment_failed(self, session):
+        order_id = session.get("metadata", {}).get("order_id", "unknown")
+        logger.warning("Payment failed for order %s", order_id)
+
 
 class ReservationViewSet(
     mixins.ListModelMixin,
@@ -59,12 +137,17 @@ class ReservationViewSet(
     def cart(self, request):
         now = timezone.now()
 
-        Reservation.objects.filter(
-            user=request.user,
-            is_active=True,
-            order__isnull=True,
-            expires_at__lte=now,
-        ).update(is_active=False)
+        try:
+            Reservation.objects.filter(
+                user=request.user,
+                is_active=True,
+                order__isnull=True,
+                expires_at__lte=now,
+            ).update(is_active=False)
+        except Exception:
+            logger.exception(
+                "Failed to expire stale reservations for user %s", request.user.pk
+            )
 
         items = (
             Reservation.objects.filter(
@@ -112,61 +195,66 @@ class OrderViewSet(
             return qs.all()
         return qs.filter(user=self.request.user)
 
-    #create order and returns payment_url
     @action(detail=False, methods=["post"])
     def checkout(self, request):
-        serializer = CheckoutSerializer(
-            data=request.data,
-            context={"request": request},
-        )
-        serializer.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                serializer = CheckoutSerializer(
+                    data=request.data, context={"request": request}
+                )
+                serializer.is_valid(raise_exception=True)
+                order = serializer.create_order()
 
-        with transaction.atomic():
-            order, payment_url = create_checkout_session(
-                user=request.user,
-                reservations=serializer.reservations,
-            )
+                logger.info("Order %s created for user %s", order.pk, request.user.pk)
 
-        return Response(
-            {
-                **OrderReadSerializer(
-                    order,
-                    context={"request": request},
-                ).data,
-                "payment_url": payment_url,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+                return Response(
+                    {
+                        **OrderReadSerializer(order, context={"request": request}).data,
+                        "payment_url": serializer._payment_url,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+        except Exception:
+            logger.exception("Checkout failed for user %s", request.user.pk)
+            raise
 
     # Cancels order and updates related tickets status accordingly
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        with transaction.atomic():
-            order = self.get_object()
-            self.check_object_permissions(request, order)
+        try:
+            with transaction.atomic():
+                order = self.get_object()
+                self.check_object_permissions(request, order)
 
-            if order.is_canceled:
-                return Response(
-                    {"detail": "Order is already canceled."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                if order.is_canceled:
+                    return Response(
+                        {"detail": "Order is already canceled."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if order.is_expired:
+                    return Response(
+                        {"detail": "Expired orders cannot be canceled."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                order.status = Order.Status.CANCELED
+                order.save(update_fields=["status"])
+                order.reservations.update(is_active=False)
+                order.tickets.filter(status=Ticket.Status.ACTIVE).update(
+                    status=Ticket.Status.CANCELED
                 )
 
-            if order.is_expired:
+                logger.info("Order %s canceled by user %s", order.pk, request.user.pk)
+
                 return Response(
-                    {"detail": "Expired orders cannot be canceled."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    OrderReadSerializer(order, context={"request": request}).data
                 )
-
-            order.status = Order.Status.CANCELED
-            order.save(update_fields=["status"])
-            order.reservations.update(is_active=False)
-            order.tickets.filter(status=Ticket.Status.ACTIVE).update(
-                status=Ticket.Status.CANCELED
+        except Exception:
+            logger.exception(
+                "Failed to cancel order %s for user %s", pk, request.user.pk
             )
-
-            return Response(
-                OrderReadSerializer(order, context={"request": request}).data
-            )
+            raise
 
 
 class TicketViewSet(
@@ -203,6 +291,8 @@ class TicketViewSet(
 
         ticket.status = Ticket.Status.CANCELED
         ticket.save(update_fields=["status"])
+
+        logger.info("Ticket %s canceled by user %s", ticket.pk, request.user.pk)
 
         # taken_seats_for_concert() already excludes CANCELED tickets.
 

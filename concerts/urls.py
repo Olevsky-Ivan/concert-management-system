@@ -9,11 +9,13 @@ from concerts.views import (
     ZoneViewSet,
     HallViewSet,
     VenueViewSet,
-    SeatViewSet
+    SeatViewSet,
 )
 
 seat_list = SeatViewSet.as_view({"get": "list", "post": "create"})
-seat_detail = SeatViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"})
+seat_detail = SeatViewSet.as_view(
+    {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+)
 
 router = DefaultRouter()
 

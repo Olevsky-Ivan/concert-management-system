@@ -94,7 +94,7 @@ class Order(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
 
     stripe_session_id = models.CharField(max_length=255, blank=True, null=True)
-    
+
     def __str__(self):
         return f"Order #{self.pk} – {self.user.email} – {self.status}"
 
@@ -109,7 +109,7 @@ class Order(models.Model):
     @property
     def is_expired(self):
         return self.status == self.Status.EXPIRED
-    
+
     def recalculate_total(self):
         self.total_price = self.reservations.filter(is_active=True).aggregate(
             total=models.Sum("price")

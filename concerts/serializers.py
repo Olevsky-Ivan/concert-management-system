@@ -45,7 +45,7 @@ class SeatSerializer(serializers.ModelSerializer):
         model = Seat
         fields = ["id", "zone", "row", "number", "is_taken"]
         read_only_fields = ["zone"]
-    
+
     # Prevent duplicate seats in zone
     def validate(self, attrs):
         zone = self.context["view"].kwargs.get("zone_pk")
@@ -54,7 +54,9 @@ class SeatSerializer(serializers.ModelSerializer):
 
         if Seat.objects.filter(zone_id=zone, row=row, number=number).exists():
             raise serializers.ValidationError(
-                {"non_field_errors": f"Seat Row {row}, Number {number} already exists in this zone."}
+                {
+                    "non_field_errors": f"Seat Row {row}, Number {number} already exists in this zone."
+                }
             )
 
         return attrs
@@ -167,16 +169,17 @@ class ReviewSerializer(serializers.ModelSerializer):
             try:
                 concert = Concert.objects.get(pk=concert_pk)
             except Concert.DoesNotExist:
-                raise serializers.ValidationError(
-                    {"concert": "Concert not found."}
-                )
+                raise serializers.ValidationError({"concert": "Concert not found."})
 
         if not concert.is_past:
             raise serializers.ValidationError(
-                {"concert": "You can only review concerts that have already taken place."}
+                {
+                    "concert": "You can only review concerts that have already taken place."
+                }
             )
 
         from tickets.models import Ticket
+
         has_ticket = Ticket.objects.filter(
             user=request.user,
             concert=concert,
@@ -189,6 +192,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
 
 class ConcertReadSerializer(serializers.ModelSerializer):
     hall = HallSerializer(read_only=True)

@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "concerts",
     "tickets",
     "django_extensions",
+    "django_celery_beat",
 ]
 
 
@@ -122,3 +123,21 @@ SPECTACULAR_SETTINGS = {
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_CURRENCY = "usd"
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "expire-stale-reservations": {
+        "task": "tickets.tasks.expire_stale_reservations",
+        "schedule": crontab(minute="*/5"),
+    },
+    "expire-stale-orders": {
+        "task": "tickets.tasks.expire_stale_orders",
+        "schedule": crontab(minute="*/15"),
+    },
+}

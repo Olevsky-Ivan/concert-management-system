@@ -14,8 +14,9 @@ from concerts.serializers import (
     ZoneWriteSerializer,
     HallSerializer,
     VenueSerializer,
-    SeatSerializer
+    SeatSerializer,
 )
+
 
 class SeatViewSet(viewsets.ModelViewSet):
     serializer_class = SeatSerializer
@@ -29,6 +30,7 @@ class SeatViewSet(viewsets.ModelViewSet):
         zone_pk = self.kwargs.get("zone_pk")
         serializer.save(zone_id=zone_pk)
 
+
 class VenueViewSet(viewsets.ModelViewSet):
     queryset = Venue.objects.all()
     serializer_class = VenueSerializer
@@ -39,7 +41,8 @@ class HallViewSet(viewsets.ModelViewSet):
     queryset = Hall.objects.select_related("venue")
     serializer_class = HallSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
-    
+
+
 class ConcertViewSet(viewsets.ModelViewSet):
     queryset = Concert.objects.select_related(
         "hall__venue", "created_by"

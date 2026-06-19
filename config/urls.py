@@ -12,13 +12,10 @@ from tickets.views import StripeWebhookView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-
     path("api/", include("concerts.urls")),
     path("api/", include("tickets.urls")),
-
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",
@@ -30,6 +27,5 @@ urlpatterns = [
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
-
     path("webhooks/stripe/", StripeWebhookView.as_view(), name="stripe-webhook"),
 ]

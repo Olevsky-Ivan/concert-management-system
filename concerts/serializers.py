@@ -178,9 +178,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             try:
                 concert = Concert.objects.get(pk=concert_pk)
             except Concert.DoesNotExist:
-                raise serializers.ValidationError(
-                    {"concert": "Concert not found."}
-                )
+                raise serializers.ValidationError({"concert": "Concert not found."})
 
         if not concert.is_past:
             raise serializers.ValidationError(
@@ -189,9 +187,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
         user = request.user
         if user is None or user.is_anonymous:
-            raise serializers.ValidationError(
-                {"detail": "Authentication required."}
-            )
+            raise serializers.ValidationError({"detail": "Authentication required."})
 
         from tickets.models import Ticket
 

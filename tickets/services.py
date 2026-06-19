@@ -5,6 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from tickets.models import Order, Ticket, Reservation
+
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL")
 

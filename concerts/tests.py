@@ -11,7 +11,6 @@ from rest_framework import status
 from concerts.models import Artist, Category, Venue, Hall, Zone, Seat, Concert
 from tickets.models import Ticket, Order, Reservation, RESERVATION_LIFETIME_MINUTES
 
-
 User = get_user_model()
 
 
@@ -29,11 +28,7 @@ def make_structure():
     hall = Hall.objects.create(name="Main Hall", venue=venue)
 
     zone = Zone.objects.create(
-        hall=hall,
-        name="A",
-        price=Decimal("100.00"),
-        capacity=10,
-        has_seats=True
+        hall=hall, name="A", price=Decimal("100.00"), capacity=10, has_seats=True
     )
 
     seat = Seat.objects.create(zone=zone, row="A", number=1)
@@ -46,7 +41,7 @@ def make_structure():
         description="Desc",
         date=timezone.now() + timedelta(days=5),
         hall=hall,
-        created_by=admin
+        created_by=admin,
     )
 
     concert.artists.add(artist)
@@ -65,13 +60,13 @@ def make_structure():
 
 
 def make_concert(hall, admin, past=False):
-    date = timezone.now() - timedelta(days=1) if past else timezone.now() + timedelta(days=5)
+    date = (
+        timezone.now() - timedelta(days=1)
+        if past
+        else timezone.now() + timedelta(days=5)
+    )
     return Concert.objects.create(
-        title="Test",
-        description="Desc",
-        date=date,
-        hall=hall,
-        created_by=admin
+        title="Test", description="Desc", date=date, hall=hall, created_by=admin
     )
 
 
@@ -87,7 +82,7 @@ def make_reservation(user, concert, zone, seat=None, expired=False):
         seat=seat,
         price=zone.price,
         expires_at=expires_at,
-        is_active=True
+        is_active=True,
     )
 
 
@@ -109,14 +104,13 @@ class ZoneLogicTest(TestCase):
 
     def test_available_seats_decreases(self):
         make_reservation(
-            self.user,
-            self.data["concert"],
-            self.data["zone"],
-            self.data["seat"]
+            self.user, self.data["concert"], self.data["zone"], self.data["seat"]
         )
         self.assertEqual(
-            self.data["zone"].available_seats_count_for_concert(self.data["concert"].pk),
-            0
+            self.data["zone"].available_seats_count_for_concert(
+                self.data["concert"].pk
+            ),
+            0,
         )
 
     def test_expired_reservation_does_not_count(self):
@@ -125,11 +119,13 @@ class ZoneLogicTest(TestCase):
             self.data["concert"],
             self.data["zone"],
             self.data["seat"],
-            expired=True
+            expired=True,
         )
         self.assertEqual(
-            self.data["zone"].available_seats_count_for_concert(self.data["concert"].pk),
-            1
+            self.data["zone"].available_seats_count_for_concert(
+                self.data["concert"].pk
+            ),
+            1,
         )
 
 
@@ -161,7 +157,7 @@ class SeatAPITest(TestCase):
         res = self.client.post(
             f"/api/zones/{self.data['zone'].id}/seats/",
             {"row": "B", "number": 2},
-            format="json"
+            format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
@@ -169,7 +165,7 @@ class SeatAPITest(TestCase):
         res = self.client.post(
             f"/api/zones/{self.data['zone'].id}/seats/",
             {"row": "A", "number": 1},
-            format="json"
+            format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -185,7 +181,7 @@ class ReviewAPITest(TestCase):
         res = self.client.post(
             f"/api/concerts/{self.data['concert'].id}/reviews/",
             {"rating": 5, "comment": "Good"},
-            format="json"
+            format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -199,16 +195,11 @@ class OrderAPITest(TestCase):
 
     def test_order_create_flow(self):
         r = make_reservation(
-            self.user,
-            self.data["concert"],
-            self.data["zone"],
-            self.data["seat"]
+            self.user, self.data["concert"], self.data["zone"], self.data["seat"]
         )
 
         order = Order.objects.create(
-            user=self.user,
-            total_price=r.price,
-            status=Order.Status.PENDING
+            user=self.user, total_price=r.price, status=Order.Status.PENDING
         )
 
         self.assertEqual(order.is_payable, True)

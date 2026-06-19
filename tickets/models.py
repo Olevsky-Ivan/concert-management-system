@@ -43,6 +43,7 @@ class Reservation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["concert", "seat"],
@@ -115,6 +116,9 @@ class Order(models.Model):
             total=models.Sum("price")
         )["total"] or Decimal("0.00")
         self.save(update_fields=["total_price"])
+
+    class Meta:
+        ordering = ["-created_at"]
 
 
 class Ticket(models.Model):

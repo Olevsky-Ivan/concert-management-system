@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 from concerts.models import Artist, Category, Concert, Hall, Review, Venue, Zone, Seat
 from concerts.permissions import IsAdminOrReadOnly, IsAdminUser
@@ -22,13 +23,17 @@ class SeatViewSet(viewsets.ModelViewSet):
     serializer_class = SeatSerializer
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
 
-    def get_queryset(self):
+    def get_zone(self):
         zone_pk = self.kwargs.get("zone_pk")
-        return Seat.objects.filter(zone_id=zone_pk)
+        return get_object_or_404(Zone, pk=zone_pk)
+
+    def get_queryset(self):
+        zone = self.get_zone()
+        return Seat.objects.filter(zone=zone)
 
     def perform_create(self, serializer):
-        zone_pk = self.kwargs.get("zone_pk")
-        serializer.save(zone_id=zone_pk)
+        zone = self.get_zone()
+        serializer.save(zone=zone)
 
 
 class VenueViewSet(viewsets.ModelViewSet):

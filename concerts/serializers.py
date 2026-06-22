@@ -157,15 +157,24 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["user", "concert", "created_at"]
 
-    # Checks whether the user can review the concert
     def validate(self, attrs):
         request = self.context.get("request")
         view = self.context.get("view")
+
+        if request is None or view is None:
+            raise serializers.ValidationError(
+                {"detail": "Invalid serializer context: request/view missing."}
+            )
 
         if self.instance:
             concert = self.instance.concert
         else:
             concert_pk = view.kwargs.get("concert_pk")
+            if not concert_pk:
+                raise serializers.ValidationError(
+                    {"concert": "concert_id is required."}
+                )
+
             try:
                 concert = Concert.objects.get(pk=concert_pk)
             except Concert.DoesNotExist:
@@ -173,22 +182,24 @@ class ReviewSerializer(serializers.ModelSerializer):
 
         if not concert.is_past:
             raise serializers.ValidationError(
-                {
-                    "concert": "You can only review concerts that have already taken place."
-                }
+                {"concert": "You can only review past concerts."}
             )
+
+        user = request.user
+        if user is None or user.is_anonymous:
+            raise serializers.ValidationError({"detail": "Authentication required."})
 
         from tickets.models import Ticket
 
         has_ticket = Ticket.objects.filter(
-            user=request.user,
+            user=user,
             concert=concert,
             status=Ticket.Status.ACTIVE,
         ).exists()
 
         if not has_ticket:
             raise serializers.ValidationError(
-                {"concert": "You can only review concerts you have attended."}
+                {"concert": "You can only review concerts you attended."}
             )
 
         return attrs

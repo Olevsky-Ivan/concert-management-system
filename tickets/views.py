@@ -32,35 +32,55 @@ logger = logging.getLogger(__name__)
 class StripeWebhookView(View):
 
     def post(self, request):
-        payload = request.body
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
-
         try:
-            event = stripe.Webhook.construct_event(
-                payload,
-                sig_header,
-                settings.STRIPE_WEBHOOK_SECRET,
-            )
-        except ValueError:
-            logger.warning("Invalid Stripe webhook payload")
-            return HttpResponse(status=400)
-        except stripe.error.SignatureVerificationError:
-            logger.warning("Invalid Stripe webhook signature")
-            return HttpResponse(status=400)
+            payload = request.body
+            sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
-        logger.info("Stripe event: %s", event["type"])
-        session = event["data"]["object"]
+            try:
+                event = stripe.Webhook.construct_event(
+                    payload,
+                    sig_header,
+                    settings.STRIPE_WEBHOOK_SECRET,
+                )
+            except ValueError:
+                logger.warning("Invalid Stripe webhook payload")
+                return HttpResponse(status=400)
+            except stripe.error.SignatureVerificationError:
+                logger.warning("Invalid Stripe webhook signature")
+                return HttpResponse(status=400)
 
-        if event["type"] == "checkout.session.completed":
-            self._handle_checkout_completed(session)
+            logger.info("Stripe event: %s", event["type"])
 
-        elif event["type"] == "checkout.session.expired":
-            self._handle_checkout_expired(session)
+            session_obj = event["data"]["object"]
+            event_type = event["type"]
 
-        elif event["type"] in ("payment_intent.payment_failed", "charge.failed"):
-            self._handle_payment_failed(session)
+            session = None
 
-        return HttpResponse(status=200)
+            try:
+                if hasattr(session_obj, "to_dict_recursive"):
+                    session = session_obj.to_dict_recursive()
+                elif hasattr(session_obj, "to_dict"):
+                    session = session_obj.to_dict()
+                else:
+                    session = session_obj
+            except Exception:
+                logger.exception("Failed to convert Stripe object")
+                session = {}
+
+            if event_type == "checkout.session.completed":
+                self._handle_checkout_completed(session)
+
+            elif event_type == "checkout.session.expired":
+                self._handle_checkout_expired(session)
+
+            elif event_type in ("payment_intent.payment_failed", "charge.failed"):
+                self._handle_payment_failed(session)
+
+            return HttpResponse(status=200)
+
+        except Exception:
+            logger.exception("Unhandled Stripe webhook error")
+            return HttpResponse(status=200)
 
     def _handle_checkout_completed(self, session):
         try:

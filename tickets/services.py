@@ -1,41 +1,13 @@
+import os
+
 import stripe
-
 from django.conf import settings
-
-from tickets.models import Order
 from django.utils import timezone
-from tickets.models import Order, Ticket
-from celery import shared_task
-from django.utils import timezone
-from tickets.models import Reservation, Order
 
+from tickets.models import Order, Ticket, Reservation
 
-@shared_task
-def expire_stale_reservations():
-    now = timezone.now()
-    expired_count = Reservation.objects.filter(
-        is_active=True,
-        order__isnull=True,
-        expires_at__lte=now,
-    ).update(is_active=False)
-
-    return f"Expired {expired_count} reservations"
-
-
-@shared_task
-def expire_stale_orders():
-    cutoff = timezone.now() - timezone.timedelta(minutes=30)
-    orders = Order.objects.filter(
-        status=Order.Status.PENDING,
-        created_at__lte=cutoff,
-    )
-    count = orders.count()
-    for order in orders:
-        order.status = Order.Status.EXPIRED
-        order.save(update_fields=["status"])
-        order.reservations.update(is_active=False)
-
-    return f"Expired {count} orders"
+STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL")
+STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL")
 
 
 def confirm_order_payment(order: Order) -> None:
@@ -94,8 +66,8 @@ def create_checkout_session(user, reservations):
         mode="payment",
         metadata={"order_id": order.pk},
         # urls for example
-        success_url="http://localhost:8000/success/",
-        cancel_url="http://localhost:8000/cancel/",
+        success_url=STRIPE_SUCCESS_URL,
+        cancel_url=STRIPE_CANCEL_URL,
     )
 
     order.stripe_session_id = session.id
